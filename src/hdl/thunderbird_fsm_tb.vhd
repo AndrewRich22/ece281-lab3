@@ -57,28 +57,92 @@ end thunderbird_fsm_tb;
 architecture test_bench of thunderbird_fsm_tb is 
 	
 	component thunderbird_fsm is 
-	  port(
-		
-	  );
+	  port( i_clk, i_reset  : in    std_logic;
+                i_left, i_right : in    std_logic;
+                o_lights_L      : out   std_logic_vector(2 downto 0);
+                o_lights_R      : out   std_logic_vector(2 downto 0)
+        );
 	end component thunderbird_fsm;
 
 	-- test I/O signals
-	
+signal w_left : std_logic := '0';
+signal w_right : std_logic := '0';
+signal w_reset : std_logic := '0';
+signal w_clk : std_logic := '0';
+signal w_righttail : std_logic_vector(2 downto 0) := "000";
+signal w_lefttail : std_logic_vector (2 downto 0) := "000";
 	-- constants
-	
+constant k_clk_period : time := 10 ns;	
 	
 begin
 	-- PORT MAPS ----------------------------------------
-	
+	--connect the above signals to this instance of thunderbird_fsm
+    uut: thunderbird_fsm port map (
+            i_left => w_left,
+            i_right => w_right,
+            i_reset => w_reset,
+            i_clk => w_clk, 
+            o_lights_R => w_righttail,
+            o_lights_L => w_lefttail
+            );
 	-----------------------------------------------------
 	
 	-- PROCESSES ----------------------------------------	
     -- Clock process ------------------------------------
-    
+    clk_proc : process
+    begin
+        w_clk <= '0';
+        wait for k_clk_period/2;
+        w_clk <= '1';
+        wait for k_clk_period/2;
+        end process;
 	-----------------------------------------------------
 	
 	-- Test Plan Process --------------------------------
-	
+	sim_proc: process
+	begin
+	  w_reset <= '1';
+	  wait for k_clk_period;
+	  assert w_righttail = "000" report "bad reset" severity failure;
+	  assert w_lefttail = "000" report "bad reset" severity failure;
+	  --this ensures that when reset is 1 and everything is off, all lights are off
 	-----------------------------------------------------	
+	w_reset <= '0';
+	wait for k_clk_period;
 	
+	w_right <= '1';
+	w_left <= '0';
+	wait for k_clk_period;
+	--now we are turning right so we are testing that at each stage a segment
+	--of the right light is turning on and the left is off
+	assert w_righttail = "001" report "Ra" severity failure;
+	assert w_lefttail = "000" report "Ra" severity failure;
+	wait for k_clk_period;
+	assert w_righttail = "011" report "Rb Ra" severity failure;
+    assert w_lefttail = "000" report "Rb Ra" severity failure;
+    wait for k_clk_period;
+    assert w_righttail = "111" report "Rc Rb Ra" severity failure;
+    assert w_lefttail = "000" report "Rc Rb Ra" severity failure;
+    wait for k_clk_period;
+    --now we are turning left testing the same thing as the other side
+    w_right <= '0';
+    w_left <= '1';
+    wait for k_clk_period;
+    assert w_righttail = "000" report "La" severity failure;
+    assert w_lefttail = "001" report "La" severity failure;
+   wait for k_clk_period;
+   assert w_righttail = "000" report "Lb La" severity failure;
+   assert w_lefttail = "011" report "Lb La" severity failure;
+   wait for k_clk_period;
+   assert w_righttail = "000" report "Lc Lb La" severity failure;
+   assert w_lefttail = "111" report "Lc Lb La" severity failure;
+   wait for k_clk_period;
+   --now we are testing that the hazard lights turns on all segments 
+   w_right <= '1';
+   w_left <= '1';
+   wait for k_clk_period;
+   assert w_righttail = "111" report "Rc Rb Ra" severity failure;
+   assert w_lefttail = "111" report "Lc Lb La" severity failure;
+   wait;
+   end process;
 end test_bench;
